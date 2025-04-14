@@ -11,16 +11,18 @@ from net1d import *
 from torch.utils.data import Dataset,DataLoader
 from LARA_plot import *
 
+# Split long FHR data into overlapping 10 minute windows (input for CNN model) 
 def split_long(long_data, step=4*60, size=4*60*10):
     monitor_time=int(len(long_data)/(4*60))
     sampled_data=np.zeros(shape=(monitor_time-10+1,4*60*10))
     for idx,start in enumerate(range(0,len(long_data)-size+step, step)):
         sampled_data[idx,:]=long_data[start:start+2400]
-        if idx!=0:
+    if idx!=0:
             assert sum(sampled_data[idx-1,-(2400-240):]==sampled_data[idx,0:2400-240])==240*9
     assert idx==monitor_time-10
     return sampled_data
 
+# Takes the split segments and run them through the trained CNN model, get risk predictions and return list of risk predictions
 def model_predict(splited_data,model,device):
     class temp_dataset(Dataset):
         def __init__(self, data):
@@ -42,10 +44,19 @@ def model_predict(splited_data,model,device):
 class LARA():
     def __init__(self,device_str) :
         'initialize the cnn kernel'
-        self.net=Net1D(in_channels=1,base_filters=256,ratio=1,
-                    filter_list=[256,512,512,1024,1024],m_blocks_list=[2,3,3,2,2],
-                    kernel_size=16,stride=2,
-                    n_classes=1,use_bn=True,use_do=True,verbose=False,groups_width=16)
+        self.net = Net1D(
+                in_channels=1,
+                base_filters=256,
+                ratio=1,
+                filter_list=[256,512,512,1024,1024],
+                m_blocks_list=[2,3,3,2,2],
+                kernel_size=16,
+                stride=2,
+                n_classes=1,
+                use_bn=True,
+                use_do=True,
+                verbose=False,
+                groups_width=16)
         self.device = torch.device(device_str if torch.cuda.is_available() else "cpu")
         self.to(self.device)
         self.net.load_state_dict(torch.load('model_state',map_location=self.device))
@@ -79,6 +90,7 @@ class LARA():
                 result=np.concatenate([result,out_y])
         return result
 
+    # Core analysis function, splits long signal -> get model prediction (y_hat) -> generates attention maps using calculate_cam() -> apply 3 fusion strategies
     def process(self,long_FHR) :
         splited_data=split_long(long_FHR)
         y_hat=model_predict(splited_data)
@@ -88,6 +100,7 @@ class LARA():
         self.R_S_result=information_fusion(y_hat,cam_value,use_weight=True,use_cam=False)
         self.long_cam=infusing_cam(cam_value)
 
+    # Visualise and prints final risk distribution map and avg risk index 
     def out_put(self, operator='R_S'):
         '''
         Three operators is supplied in LARA

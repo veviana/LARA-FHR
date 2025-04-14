@@ -4,7 +4,8 @@ Since our model is 1-d CNN model, we fixed the Grad-
 from pytorch_grad_cam import GradCAM
 import numpy as np
 import torch
-
+# Used to generate Grad-CAM values, which are then used in information fusion to improve final predictions 
+# Generate Grad-CAM attention maps for each 10min FHR segment 
 def calculate_cam(sampled_data,model,device):
     cam=GradCAM(model=model, target_layers=[model.stage_list[4]])
     cam_table=np.zeros_like(sampled_data)
@@ -17,6 +18,7 @@ def calculate_cam(sampled_data,model,device):
 
 
 #-------------------------------------------------------------------------------------------------------#
+# Aggregate CAM values into a minute-wise attention trend (long_cam) across the whole monitoring session
 def infusing_cam(cam_value):
     infused_cam=cam_value.reshape(len(cam_value),10,240).mean(axis=2)
     monitor_time=len(cam_value)+9

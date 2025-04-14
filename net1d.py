@@ -4,6 +4,16 @@ a modularized deep neural network for 1-d signal data, pytorch version
 Shenda Hong, Mar 2020
 """
 
+'''
+
+TLDR; brain behind LARA system
+Pass a 10 minute FHR segment to LARA, the model will:
+1. Reads the waveform
+2. Extract deep patterns (accelerations / decelerations)
+3. Outputs risk score (0 = normal, 1 = high risk)
+
+''' 
+
 import numpy as np
 from collections import Counter
 from matplotlib import pyplot as plt
@@ -14,6 +24,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
+# For loading (data, label) pairs, used during model training to feed input FHR segments and their labels
+# TLDR: helper to load data for training / testing 
 class MyDataset(Dataset):
     def __init__(self, data, label):
         self.data = data
@@ -90,11 +102,13 @@ class MyMaxPool1dPadSame(nn.Module):
         net = self.max_pool(net)
         
         return net
-    
+
+# An activation function that helps the model learn better
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
 
+# A smart block that does a bunch of convolutions + attention + skip connections
 class BasicBlock(nn.Module):
     """
     Basic Block: 
@@ -227,6 +241,7 @@ class BasicBlock(nn.Module):
 
         return out
 
+# A group of BasicBlocks. Think of it as a “layer group”
 class BasicStage(nn.Module):
     """
     Basic Stage:
@@ -293,6 +308,7 @@ class BasicStage(nn.Module):
 
         return out
 
+# The whole model — first conv layer + several stages + a final prediction layer
 class Net1D(nn.Module):
     """
     

@@ -7,6 +7,8 @@ from net1d import *
 Import the training data, replace the sata_path of your own
 Data we use is in form of n*2401  fs=4hz  1(label)+4*60*10
 '''
+# Purpose: Train model, resulting model weights are saved to model_state , which is later loaded by LARA.py to make predictions 
+# Train the CNN model using pre-processed FHR training data. Once training is done, saves the trained model weights to model_state, which LARA later use to make predictions
 data_path=r'/data/resampled_train_data.npy'
 
 class train_set(Dataset):
@@ -18,15 +20,25 @@ class train_set(Dataset):
         return len(self.dataset)
     def get_all(self):
         return (self.dataset[:,1:2401],self.dataset[:,0])
-    
+
+# Shuffle data for training 
 train_dataset=train_set()
 train_iter=DataLoader(train_dataset,batch_size=64,shuffle=True)
 
 'The structure of cnn model in LARA'
-net=Net1D(in_channels=1,base_filters=256,ratio=1,
-          filter_list=[256,512,512,1024,1024],m_blocks_list=[2,3,3,2,2],
-          kernel_size=16,stride=2,
-          n_classes=1,use_bn=True,use_do=True,verbose=False,groups_width=16)##理论上n_class永远不应该是2
+net = Net1D(
+    in_channels=1,
+    base_filters=256,
+    ratio=1,
+    filter_list=[256,512,512,1024,1024],
+    m_blocks_list=[2,3,3,2,2],
+    kernel_size=16,
+    stride=2,
+    n_classes=1,
+    use_bn=True,
+    use_do=True,
+    verbose=False,
+    groups_width=16) 
 
 device_str = "cuda"
 device = torch.device(device_str if torch.cuda.is_available() else "cpu")
@@ -34,6 +46,7 @@ net.to(device=device)
 lossfun=nn.BCELoss()
 updater=torch.optim.Adam(net.parameters(),lr=1e-3)
 
+# Training loop ; for 200 epochs 
 train_loss=[]
 for epoch in range(200):
     net.train()
